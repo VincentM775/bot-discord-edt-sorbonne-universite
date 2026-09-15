@@ -146,6 +146,25 @@ def fetch_cours(
     return _cours_du_jour(ics_texts, jour)
 
 
+def fetch_semaine(
+    url: str,
+    user: str,
+    password: str,
+    lundi: dt.date,
+    nb_jours: int = 7,
+    timeout: int = 90,
+) -> dict[dt.date, list[Cours]]:
+    """Retourne les cours de la semaine sous forme {date: [Cours]}, en une seule
+    requête. `lundi` est le premier jour ; `nb_jours` le nombre de jours couverts."""
+    debut = dt.datetime.combine(lundi - dt.timedelta(days=1), dt.time.min, PARIS)
+    fin = dt.datetime.combine(lundi + dt.timedelta(days=nb_jours + 1), dt.time.min, PARIS)
+    ics_texts = _report(url, user, password, debut, fin, timeout)
+    return {
+        (jour := lundi + dt.timedelta(days=i)): _cours_du_jour(ics_texts, jour)
+        for i in range(nb_jours)
+    }
+
+
 if __name__ == "__main__":
     # Petit test manuel : affiche les cours de demain.
     import os
