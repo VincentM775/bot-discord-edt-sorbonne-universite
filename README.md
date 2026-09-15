@@ -1,8 +1,8 @@
 # Bot Discord — Emploi du temps (UFR Info P6 / Jussieu)
 
 Poste automatiquement l'emploi du temps dans un salon Discord **chaque soir, pour
-le lendemain**, plus un **récapitulatif de la semaine à venir le dimanche soir**.
-Configuré par défaut pour **M1_RES_ALT** (parcours Réseaux, alternance).
+le lendemain**. Configuré par défaut pour **M1_RES_ALT** (parcours Réseaux,
+alternance).
 
 Les données sont lues directement depuis le serveur **CalDAV** de l'UFR (matière,
 horaire, salle) — pas de screenshot, robuste aux changements du site. Le compte
@@ -40,8 +40,7 @@ Remplis `.env` : `DISCORD_TOKEN`, `DISCORD_CHANNEL_ID`, et éventuellement
 python edt.py
 
 # Lancer le bot, puis dans le salon :
-#   !edt      -> emploi du temps du jour cible
-#   !semaine  -> aperçu de la semaine en cours
+#   !edt  -> emploi du temps du jour cible
 python bot.py
 ```
 
@@ -79,11 +78,3 @@ Autres masters : remplace `RES` par `ANDROIDE`, `BIM`, `DAC`, `IMA`, `IQ`, `SAR`
 | `SEND_TIME` | Heure de l'envoi quotidien (Europe/Paris), `HH:MM` |
 | `SEND_FOR` | `tomorrow` (défaut) ou `today` |
 | `POST_WHEN_EMPTY` | `true` = poster "Pas de cours 🎉" même les jours vides |
-| `WEEKLY_ENABLED` | `true` = activer le récap hebdomadaire |
-| `WEEKLY_TIME` | Heure de l'envoi hebdo (Europe/Paris), `HH:MM` |
-| `WEEKLY_DAY` | Jour d'envoi : `0` = lundi … `6` = dimanche (défaut `6` = dimanche soir) |
-| `WEEKLY_DAYS` | Jours affichés : `5` = lun→ven, `7` = semaine complète |
-
-> Le récap hebdo affiche toujours la **semaine à venir** (prochain lundi). Avec les
-> réglages par défaut, il part le **dimanche soir** — comme l'envoi quotidien, mais
-> pour toute la semaine suivante.

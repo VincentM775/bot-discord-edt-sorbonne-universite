@@ -5,6 +5,7 @@ testable seul (voir `python edt.py`)."""
 from __future__ import annotations
 
 import datetime as dt
+import re
 from dataclasses import dataclass
 from zoneinfo import ZoneInfo
 
@@ -39,7 +40,26 @@ class Cours:
 
     @property
     def horaire(self) -> str:
-        return f"{self.debut.strftime('%H:%M')} – {self.fin.strftime('%H:%M')}"
+        return f"{self.debut.strftime('%H:%M')} à {self.fin.strftime('%H:%M')}"
+
+
+# Les intitulés CalDAV ont la forme "UM4IN001-ARES-CS" : code UE, nom court de
+# la matière, type de séance. On ne garde que le nom court.
+_RE_CODE_UE = re.compile(r"^[A-Z]{2,}\d[A-Z0-9]*-", re.IGNORECASE)
+_RE_TYPE_SEANCE = re.compile(r"-(CS|CM|CTD|TD|TME|TP|TA|EX|EXAM)\d*$", re.IGNORECASE)
+# Les lieux portent un identifiant interne : "AMPHI.45B (Réservation : 696777)".
+_RE_RESERVATION = re.compile(r"\s*\(\s*r[ée]servation\s*:[^)]*\)", re.IGNORECASE)
+
+
+def _titre_court(titre: str) -> str:
+    """"UM4IN001-ARES-CS" -> "ARES". Retourne l'original si le motif ne colle pas."""
+    court = _RE_TYPE_SEANCE.sub("", _RE_CODE_UE.sub("", titre)).strip(" -")
+    return court or titre
+
+
+def _lieu_court(lieu: str) -> str:
+    """"AMPHI.45B (Réservation : 696777)" -> "AMPHI.45B"."""
+    return _RE_RESERVATION.sub("", lieu).strip()
 
 
 def _iter_calendar_data(xml_bytes: bytes):
@@ -102,6 +122,8 @@ def _cours_du_jour(ics_texts: list[str], jour: dt.date) -> list[Cours]:
 
             titre = str(ev.get("SUMMARY", "(sans titre)")).replace("\\n", " ").strip()
             lieu = str(ev.get("LOCATION", "")).replace("\\n", " ").strip()
+            titre = _titre_court(titre)
+            lieu = _lieu_court(lieu)
             cours.append(Cours(debut=debut, fin=fin, titre=titre, lieu=lieu))
 
     cours.sort(key=lambda c: c.debut)
@@ -124,25 +146,6 @@ def fetch_cours(
     return _cours_du_jour(ics_texts, jour)
 
 
-def fetch_semaine(
-    url: str,
-    user: str,
-    password: str,
-    lundi: dt.date,
-    nb_jours: int = 7,
-    timeout: int = 90,
-) -> dict[dt.date, list[Cours]]:
-    """Retourne les cours de la semaine sous forme {date: [Cours]}, en une seule
-    requête. `lundi` est le premier jour ; `nb_jours` le nombre de jours couverts."""
-    debut = dt.datetime.combine(lundi - dt.timedelta(days=1), dt.time.min, PARIS)
-    fin = dt.datetime.combine(lundi + dt.timedelta(days=nb_jours + 1), dt.time.min, PARIS)
-    ics_texts = _report(url, user, password, debut, fin, timeout)
-    return {
-        (jour := lundi + dt.timedelta(days=i)): _cours_du_jour(ics_texts, jour)
-        for i in range(nb_jours)
-    }
-
-
 if __name__ == "__main__":
     # Petit test manuel : affiche les cours de demain.
     import os
@@ -163,21 +166,3 @@ if __name__ == "__main__":
     print(f"{len(liste)} cours le {demain:%A %d/%m/%Y}")
     for c in liste:
         print(f"  {c.horaire}  {c.titre}  @ {c.lieu}")
-
-    # Aperçu de la semaine en cours (lundi -> dimanche).
-    url = os.environ.get(
-        "CALDAV_URL",
-        "https://cal.ufr-info-p6.jussieu.fr:443/caldav.php/RES/M1_RES-ITESCIA/",
-    )
-    aujourdhui = dt.datetime.now(PARIS).date()
-    lundi = aujourdhui - dt.timedelta(days=aujourdhui.weekday())
-    print(f"\n--- Semaine du {lundi:%d/%m/%Y} ---")
-    for jour, cs in fetch_semaine(
-        url,
-        os.environ.get("CALDAV_USER", "student.master"),
-        os.environ.get("CALDAV_PASSWORD", "guest"),
-        lundi,
-    ).items():
-        print(f"{jour:%A %d/%m} : {len(cs)} cours")
-        for c in cs:
-            print(f"  {c.horaire}  {c.titre}  @ {c.lieu}")
