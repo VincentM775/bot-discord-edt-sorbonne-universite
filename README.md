@@ -40,8 +40,10 @@ Remplis `.env` : `DISCORD_TOKEN`, `DISCORD_CHANNEL_ID`, et éventuellement
 python edt.py
 
 # Lancer le bot, puis dans le salon :
-#   !edt      -> emploi du temps du jour cible
-#   !semaine  -> aperçu de la semaine en cours
+#   !edt              -> emploi du temps d'aujourd'hui
+#   !edt hier         -> aussi : aujourd'hui, demain
+#                        (ou en anglais : yesterday, today, tomorrow)
+#   !semaine          -> aperçu de la semaine en cours
 python bot.py
 ```
 

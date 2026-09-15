@@ -65,6 +65,29 @@ def _date_fr(d: dt.date) -> str:
     return f"{_JOURS[d.weekday()]} {d.day} {_MOIS[d.month - 1]} {d.year}"
 
 
+# Arguments acceptés par !edt (français et anglais), en décalage de jours par
+# rapport à aujourd'hui.
+_DECALAGES = {
+    "hier": -1,
+    "yesterday": -1,
+    "aujourdhui": 0,
+    "ajd": 0,
+    "today": 0,
+    "demain": 1,
+    "tomorrow": 1,
+}
+
+
+def _jour_demande(quand: str) -> dt.date | None:
+    """Convertit l'argument de !edt en date : sans argument, c'est aujourd'hui.
+    None si l'argument est inconnu. (L'envoi automatique du soir, lui, suit
+    SEND_FOR et vise donc le lendemain.)"""
+    cle = quand.strip().lower().replace("'", "").replace("\u2019", "") or "aujourdhui"
+    if cle not in _DECALAGES:
+        return None
+    return dt.datetime.now(PARIS).date() + dt.timedelta(days=_DECALAGES[cle])
+
+
 def _jour_cible() -> dt.date:
     today = dt.datetime.now(PARIS).date()
     return today + dt.timedelta(days=1) if SEND_FOR == "tomorrow" else today
@@ -120,6 +143,21 @@ def construire_embed_semaine(lundi: dt.date) -> discord.Embed:
     return embed
 
 
+# Easter egg : réponse à tout message privé qui n'est pas une commande.
+REPONSE_MP = """Salut 👋
+
+Si tu veux l'emploi du temps, écris-moi :
+• `!edt` — les cours d'**aujourd'hui** (chaque soir je poste aussi ceux du lendemain, tout seul)
+• `!edt hier`, `!edt aujourd'hui`, `!edt demain` — la journée de ton choix (l'anglais marche aussi : `yesterday`, `today`, `tomorrow`)
+• `!semaine` — toute la **semaine en cours**, jour par jour, du lundi au vendredi
+
+Et sinon… pourquoi tu viens me déranger ? 🤨
+Si tu veux de l'aide pour tes exos de transformée de Fourier, envoie-les moi : je me ferai un plaisir de **ne pas** te répondre. 
+(Je préfère les additions moi : 1+2=3, 3+4=5, ouais je sais ta vu comment je suis trop fort ?? 😎)
+
+Allez, va réviser, et bon courage pour ton exam ^^"""
+
+
 intents = discord.Intents.default()
 intents.message_content = True
 bot = commands.Bot(command_prefix="!", intents=intents)
@@ -168,9 +206,18 @@ async def envoi_hebdomadaire() -> None:
 
 
 @bot.command(name="edt")
-async def cmd_edt(ctx: commands.Context) -> None:
-    """Force l'envoi de l'emploi du temps (jour cible) dans le salon courant."""
-    embed = construire_embed(_jour_cible())
+async def cmd_edt(ctx: commands.Context, quand: str = "") -> None:
+    """Emploi du temps d'un jour : `!edt`, `!edt hier|aujourd'hui|demain`
+    (ou `yesterday|today|tomorrow`)."""
+    jour = _jour_demande(quand)
+    if jour is None:
+        await ctx.send(
+            f"Je ne connais pas `{quand}` 🤔 — essaie `!edt`, `!edt hier`, "
+            "`!edt aujourd'hui` ou `!edt demain` (ou en anglais : `yesterday`, "
+            "`today`, `tomorrow`)."
+        )
+        return
+    embed = construire_embed(jour)
     await ctx.send(embed=embed)
 
 
@@ -179,6 +226,21 @@ async def cmd_semaine(ctx: commands.Context) -> None:
     """Force l'envoi de l'aperçu de la semaine en cours."""
     embed = construire_embed_semaine(_lundi_courant())
     await ctx.send(embed=embed)
+
+
+@bot.event
+async def on_message(message: discord.Message) -> None:
+    # En privé, tout ce qui n'est pas une commande valide déclenche l'easter egg.
+    # En salon, comportement inchangé.
+    if message.author.bot:
+        return
+    if message.guild is None:
+        ctx = await bot.get_context(message)
+        if not ctx.valid:
+            log.info("Easter egg envoyé à %s", message.author)
+            await message.channel.send(REPONSE_MP)
+            return
+    await bot.process_commands(message)
 
 
 @bot.event
